@@ -6,6 +6,7 @@ est selectionnee.
 """
 import math
 import os
+from pathlib import Path
 
 import altair as alt
 import pandas as pd
@@ -58,6 +59,16 @@ def query(sql: str, params: dict | None = None) -> pd.DataFrame:
         return pd.read_sql(text(sql), conn, params=params or {})
 
 
+# Mode demo : si PostgreSQL est injoignable (ex. hebergement en ligne), le dashboard lit des
+# exports figes du pipeline (dashboard/demo_data/, produits par scripts/export_demo.ps1).
+DEMO_DIR = Path(__file__).parent / "demo_data"
+
+
+@st.cache_data(show_spinner=False)
+def demo(name: str) -> pd.DataFrame:
+    return pd.read_csv(DEMO_DIR / f"{name}.csv.gz")
+
+
 def fmt(n, suffix="") -> str:
     return f"{n:,.0f}".replace(",", " ") + suffix
 
@@ -67,13 +78,17 @@ def lerp_color(t: float) -> list[int]:
     return [int(a[i] + (b[i] - a[i]) * t) for i in range(3)] + [190]
 
 
+DEMO = False
 try:
     mart = query("select * from marts.mart_prix_commune_annee")
 except Exception as exc:  # base absente ou pas encore alimentee
-    st.error("Impossible de lire l'entrepot. Verifie que le pipeline a tourne : "
-             "`docker compose ps`, puis lance le DAG `pipeline_dvf` dans Airflow.")
-    st.caption(str(exc).splitlines()[0])
-    st.stop()
+    if (DEMO_DIR / "mart.csv.gz").exists():
+        DEMO, mart = True, demo("mart")
+    else:
+        st.error("Impossible de lire l'entrepot. Verifie que le pipeline a tourne : "
+                 "`docker compose ps`, puis lance le DAG `pipeline_dvf` dans Airflow.")
+        st.caption(str(exc).splitlines()[0])
+        st.stop()
 
 if mart.empty:
     st.warning("Le mart est vide : lance le DAG `pipeline_dvf` dans Airflow.")
@@ -81,10 +96,17 @@ if mart.empty:
 
 mart["annee"] = mart["annee"].astype(int)
 annees = sorted(mart["annee"].unique())
-loaded_at = query("select max(_loaded_at) as t from raw.dvf")["t"].iloc[0]
+if DEMO:
+    meta = demo("meta").iloc[0]
+    loaded_at = pd.to_datetime(meta["loaded_at"])
+else:
+    loaded_at = query("select max(_loaded_at) as t from raw.dvf")["t"].iloc[0]
 
 # ---- filtres ---------------------------------------------------------------------------------
 st.markdown("<p class='page-title'>Prix de l'immobilier par commune (Oise, Paris, Seine-Saint-Denis)</p>", unsafe_allow_html=True)
+if DEMO:
+    st.info("Démo en ligne : les chiffres sont un export figé du pipeline (PostgreSQL, dbt, Airflow). "
+            "En local, ce tableau de bord lit directement l'entrepôt avec `docker compose up`.")
 top = st.columns([1.3, 1, 1.4], gap="large")
 with top[0]:
     type_local = st.segmented_control("Type de bien", ["Appartement", "Maison"],
@@ -205,11 +227,17 @@ with st.container(border=True):
     st.markdown(f"<p class='panel-title'>Chaque vente de {annee}</p>"
                 "<p class='panel-sub'>Un point par vente ; plus c'est foncé, plus le prix au m² est élevé "
                 "(échantillon de 6 000 ventes au plus)</p>", unsafe_allow_html=True)
-    pts = query("""select longitude, latitude, prix_m2, surface_reelle_bati as surface, date_mutation
-                   from marts.fct_ventes
-                   where annee = :a and type_local = :t and code_departement = any(:d)
-                     and longitude is not null and latitude is not null
-                   order by random() limit 6000""", {"a": int(annee), "t": type_local, "d": list(deps)})
+    if DEMO:
+        v = demo("ventes")
+        v = v[(v["annee"] == int(annee)) & (v["type_local"] == type_local)
+              & (v["code_departement"].astype(str).isin([str(d) for d in deps]))]
+        pts = v.sample(min(6000, len(v)), random_state=0) if len(v) else v
+    else:
+        pts = query("""select longitude, latitude, prix_m2, surface_reelle_bati as surface, date_mutation
+                       from marts.fct_ventes
+                       where annee = :a and type_local = :t and code_departement = any(:d)
+                         and longitude is not null and latitude is not null
+                       order by random() limit 6000""", {"a": int(annee), "t": type_local, "d": list(deps)})
     if pts.empty:
         st.info("Aucune vente géolocalisée pour cette sélection.")
     else:
@@ -238,7 +266,7 @@ with st.container(border=True):
 
 # ---- d'ou viennent ces chiffres --------------------------------------------------------------
 with st.expander("D'où viennent ces chiffres ?"):
-    n = query("""select (select count(*) from raw.dvf) as brut,
+    n = meta if DEMO else query("""select (select count(*) from raw.dvf) as brut,
                         (select count(*) from staging.stg_transactions) as propre,
                         (select count(*) from marts.fct_ventes) as ventes""").iloc[0]
     st.markdown(
