@@ -9,6 +9,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
     AIRFLOW__API_AUTH__JWT_SECRET: dev-only-secret-change-me-0123456789
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
     WH_HOST: warehouse
     WH_PORT: "5432"
     WH_DB: dvf
@@ -73,6 +74,24 @@ services:
   airflow-dag-processor:
     <<: *airflow-common
     command: ["dag-processor"]
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: ["triggerer"]
+
+  dashboard:
+    build: ./dashboard
+    environment:
+      WH_HOST: warehouse
+      WH_PORT: "5432"
+      WH_DB: dvf
+      WH_USER: dvf
+      WH_PASSWORD: dvf
+    ports:
+      - "8501:8501"
+    depends_on:
+      warehouse:
+        condition: service_healthy
 
 volumes:
   warehouse-data:

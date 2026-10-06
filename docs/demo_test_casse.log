@@ -1,0 +1,47 @@
+
+=== Demonstration du test casse (2026-10-06 17:25) ===
+
+[0/5] Remise a zero : rechargement de dvf_93_2025 puis dbt build (base de depart saine)
+  dvf_93_2025.csv.gz: 51657 lignes (0.2 s)
+  Total : 51657 lignes en 0.2 s
+  15:25:37  Done. PASS=22 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=22
+
+[1/5] Etat avant
+  raw.dvf (93, 2025)        : 51657 lignes
+  fct_ventes (93, 2025)     : 11897 ventes
+  mart (93, 2025) nb_ventes : 11897
+
+[2/5] Simulation d'un fichier tronque : suppression de 80 % des lignes de dvf_93_2025
+  raw.dvf (93, 2025)        : 10376 lignes
+
+[3/5] dbt build (doit echouer)
+  15:25:50  18 of 22 FAIL 1 volume_ventes_par_dept_annee ................................... [FAIL 1 in 0.06s]
+  15:25:51  19 of 22 SKIP relation marts.mart_prix_commune_annee ........................... [SKIP]
+  15:25:51  22 of 22 SKIP test unique_mart_prix_commune_annee_cle .......................... [SKIP]
+  15:25:51  20 of 22 SKIP test not_null_mart_prix_commune_annee_cle ........................ [SKIP]
+  15:25:51  21 of 22 SKIP test not_null_mart_prix_commune_annee_nb_ventes .................. [SKIP]
+  15:25:51  Completed with 1 error, 0 partial successes, and 0 warnings:
+  15:25:51  [ERROR]: in test volume_ventes_par_dept_annee (tests/volume_ventes_par_dept_annee.sql)
+  15:25:51    Got 1 result, configured to fail if != 0
+  15:25:51  Done. PASS=17 WARN=0 ERROR=1 SKIP=4 NO-OP=0 REUSED=0 TOTAL=22
+  code de sortie dbt : 1 (0 = succes, autre = echec)
+
+[4/5] Etat apres l'echec
+  fct_ventes (93, 2025)     : 2585 ventes (reconstruite avant son test)
+  mart (93, 2025) nb_ventes : 11897 (avant : 11897)
+  -> le mart n'a PAS ete mis a jour : il est protege.
+
+[5/5] Meme echec cote Airflow : relance de la tache dbt_build
+  ingest : success
+  dbt_freshness : success
+  dbt_docs : upstream_failed
+  dbt_build : failed
+
+=== Reparation : rechargement du fichier puis dbt build ===
+  dvf_93_2025.csv.gz: 51657 lignes (0.2 s)
+  Total : 51657 lignes en 0.2 s
+  15:26:57  Completed successfully
+  15:26:57  Done. PASS=22 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=22
+  mart (93, 2025) nb_ventes : 11897
+
+Termine. Resultat dans docs\demo_test_casse.log - envoie-le moi.

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dvf
+          POSTGRES_PASSWORD: dvf
+          POSTGRES_DB: dvf
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dvf -d dvf" --health-interval 5s --health-retries 10
+    env:
+      WH_HOST: localhost
+      WH_PORT: "5432"
+      WH_DB: dvf
+      WH_USER: dvf
+      WH_PASSWORD: dvf
+      DVF_DATA_DIR: ${{ github.workspace }}/data
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Docker Compose file is valid
+        run: docker compose config --quiet
+      - name: Unit tests (ingestion)
+        run: pytest -q tests
+      - name: Ingest one real file (Seine-Saint-Denis 2025)
+        run: python ingestion/download_and_load.py --years 2025 --deps 93
+      - name: dbt build (models + data tests)
+        working-directory: dbt_project
+        run: dbt build --profiles-dir .

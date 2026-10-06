@@ -1,0 +1,6 @@
+streamlit>=1.40
+pandas
+sqlalchemy
+psycopg2-binary
+altair
+pydeck
