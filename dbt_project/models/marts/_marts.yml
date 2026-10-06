@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: dim_communes
+    description: Communes presentes dans les transactions.
+    columns:
+      - name: code_commune
+        data_tests: [unique, not_null]
+
+  - name: fct_ventes
+    description: Une ligne par vente de logement comparable, avec son prix au m2.
+    columns:
+      - name: id_mutation
+        data_tests: [unique, not_null]
+      - name: code_commune
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_communes')
+                field: code_commune
+      - name: type_local
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Maison, Appartement]
+      - name: prix_m2
+        description: Valeur fonciere / surface batie, en euros par m2.
+        data_tests:
+          - not_null
+          - prix_m2_plausible
+
+  - name: mart_prix_commune_annee
+    description: Prix au m2 median par commune, annee et type de bien (source du tableau de bord).
+    columns:
+      - name: cle
+        data_tests: [unique, not_null]
+      - name: nb_ventes
+        data_tests: [not_null]

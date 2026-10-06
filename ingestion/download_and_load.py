@@ -29,7 +29,7 @@ IDENT = re.compile(r"^[a-z_][a-z0-9_]*$")
 def connect():
     return psycopg2.connect(host=os.environ["WH_HOST"], port=os.environ["WH_PORT"],
                             dbname=os.environ["WH_DB"], user=os.environ["WH_USER"],
-                            password=os.environ["WH_PASSWORD"])
+                            password=os.environ["WH_PASSWORD"], client_encoding="utf8")
 
 
 def download(year: int, dep: str, data_dir: Path = DATA_DIR) -> Path:

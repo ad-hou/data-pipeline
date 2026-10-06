@@ -1,0 +1,13 @@
+# Connexion a l'entrepot : lue depuis les variables d'environnement du conteneur Airflow.
+dvf:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('WH_HOST', 'localhost') }}"
+      port: "{{ env_var('WH_PORT', '5433') | as_number }}"
+      user: "{{ env_var('WH_USER', 'dvf') }}"
+      password: "{{ env_var('WH_PASSWORD', 'dvf') }}"
+      dbname: "{{ env_var('WH_DB', 'dvf') }}"
+      schema: analytics
+      threads: 4

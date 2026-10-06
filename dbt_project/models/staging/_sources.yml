@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Donnees brutes chargees par ingestion/download_and_load.py, sans transformation.
+    schema: raw
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: {count: 7, period: day}
+      error_after: {count: 30, period: day}
+    tables:
+      - name: dvf
+        description: Une ligne par (mutation, parcelle, local). Toutes les colonnes sont en texte.
+        columns:
+          - name: id_mutation
+            description: Quelques lignes sans identifiant sont tolerees (staging les ecarte) ; au-dela de 100, le pipeline echoue.
+            data_tests:
+              - not_null:
+                  config:
+                    warn_if: ">0"
+                    error_if: ">100"

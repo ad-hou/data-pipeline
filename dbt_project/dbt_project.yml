@@ -1,0 +1,28 @@
+name: dvf
+version: "1.0.0"
+config-version: 2
+profile: dvf
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: target
+clean-targets: ["target", "dbt_packages"]
+
+# Plage de prix au m2 consideree plausible (euros/m2) : utilisee par fct_ventes ET par son test
+vars:
+  prix_m2_min: 300
+  prix_m2_max: 40000
+  volume_ratio_min: 0.5
+
+# ANALYZE apres chaque table : sans statistiques, Postgres choisit de mauvais plans de jointure
+# (fct_ventes depassait 3 minutes sur 620 000 lignes avant ce correctif).
+models:
+  dvf:
+    +post-hook: "analyze {{ this }}"
+    staging:
+      +materialized: table
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
